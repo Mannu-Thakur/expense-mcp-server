@@ -35,12 +35,14 @@ RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 USER appuser
 
 # Default to HTTP transport in container
+# PORT defaults to 10000 (Render's standard port).
+# docker-compose.yml overrides PORT=8000 for local use.
 ENV TRANSPORT=streamable-http \
     HOST=0.0.0.0 \
-    PORT=8000 \
+    PORT=10000 \
     APP_ENV=production \
     LOG_LEVEL=INFO
 
-EXPOSE 8000
+EXPOSE 10000
 
 CMD ["python", "run.py"]

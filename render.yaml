@@ -1,19 +1,17 @@
+# render.yaml — Expense MCP Server
+# Blueprint spec: https://render.com/docs/blueprint-spec
+#
+# IMPORTANT: Render Postgres databases must be defined under the top-level
+# `databases:` key, NOT inside `services:`. The `type: pserv` value means
+# "private app service" — it is NOT PostgreSQL.
+
+# ── Web Services ───────────────────────────────────────────────────────────────
 services:
-
-  # ── PostgreSQL Database ───────────────────────────────────────
-  - type: pserv
-    name: expense-db
-    plan: free
-
-  # ── MCP Web Service ───────────────────────────────────────────
   - type: web
     name: expense-mcp-server
+    runtime: docker          # Use the Dockerfile (handles psycopg2/libpq cleanly)
     plan: free
-    runtime: python
     region: singapore
-
-    buildCommand: pip install -r requirements.txt
-    startCommand: python run.py
 
     healthCheckPath: /health
 
@@ -40,3 +38,10 @@ services:
         fromDatabase:
           name: expense-db
           property: connectionString
+
+# ── PostgreSQL Databases ───────────────────────────────────────────────────────
+# Render Postgres must be defined here, under `databases:` — never in `services:`
+databases:
+  - name: expense-db
+    plan: free
+    region: singapore
