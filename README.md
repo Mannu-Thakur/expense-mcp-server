@@ -1,17 +1,103 @@
 # 💸 Expense MCP Server
 
-A production-ready **Model Context Protocol (MCP) server** for managing personal expenses — built with FastMCP, SQLAlchemy, and Pydantic. Deploy locally via STDIO, run in Docker with PostgreSQL, or host on Render for remote access from Claude Desktop.
+A production-ready **Model Context Protocol (MCP) server** for managing personal expenses — built with FastMCP, SQLAlchemy, and Pydantic. Deploys as a Docker container on Render with PostgreSQL, and connects to Claude Desktop, Cursor, VS Code, or any MCP-compatible client.
+
+---
+
+## Status
+
+✅ **Live on Render** — Docker · PostgreSQL · Streamable HTTP
+
+| | |
+|---|---|
+| **Transport** | Streamable HTTP |
+| **Database** | PostgreSQL (Render managed) |
+| **Health endpoint** | `/health` |
+| **MCP endpoint** | `/mcp` |
+
+---
+
+## Architecture
+
+```
+Claude Desktop / Cursor / VS Code MCP
+            │
+            │  MCP over Streamable HTTP
+            ▼
+   ┌─────────────────────┐
+   │  Expense MCP Server │  Docker · Render
+   │  FastMCP + Uvicorn  │
+   └────────┬────────────┘
+            │
+            ▼
+   ┌─────────────────────┐
+   │   Expense Service   │  Business logic
+   └────────┬────────────┘
+            │
+            ▼
+   ┌─────────────────────┐
+   │     Repository      │  Data access layer
+   └────────┬────────────┘
+            │
+            ▼
+   ┌─────────────────────┐
+   │  SQLAlchemy ORM     │
+   └────────┬────────────┘
+            │
+            ▼
+   ┌─────────────────────┐
+   │  PostgreSQL / SQLite│  Prod / Dev
+   └─────────────────────┘
+```
+
+### API Request Flow
+
+```
+Claude  →  MCP Tool  →  FastMCP  →  Expense Service  →  Repository  →  SQLAlchemy  →  PostgreSQL
+```
 
 ---
 
 ## ✨ Features
 
 - **8 MCP Tools** — add, list, update, delete, search expenses, and get monthly/category/merchant summaries
-- **Dual transport** — STDIO (local) and Streamable HTTP (remote/Docker)
+- **Dual transport** — STDIO (local Claude Desktop) and Streamable HTTP (remote/Docker/Render)
 - **Dual database** — SQLite for local development, PostgreSQL for production
-- **Production hardened** — structured logging, custom exceptions, connection pooling, non-root Docker user
+- **Production-ready** — structured logging, custom exceptions, connection pooling, non-root Docker user
 - **31 tests** — full repository, service, and tool coverage with in-memory SQLite isolation
-- **One-command deploy** — `render.yaml` Blueprint auto-provisions PostgreSQL + web service
+- **One-command deploy** — `render.yaml` Blueprint auto-provisions PostgreSQL + Docker web service
+
+### Production Features
+
+| Feature | Detail |
+|---|---|
+| ✓ Docker multi-stage image | Minimal, hardened runtime layer |
+| ✓ PostgreSQL | Render-managed with connection pooling |
+| ✓ Render Blueprint | Auto-provisions all infrastructure |
+| ✓ Health endpoint | `/health` for Render and load balancer checks |
+| ✓ Remote HTTP MCP | Accessible at `/mcp` from any MCP client |
+| ✓ Connection pooling | `pool_size=5`, `max_overflow=10`, `pool_recycle=1800` |
+| ✓ Structured logging | ISO timestamps, log levels, logger names |
+| ✓ Non-root container | `appuser` with no escalation |
+| ✓ Automatic DB provisioning | Tables created on first startup |
+
+---
+
+## Compatible Clients
+
+✅ Claude Desktop  
+✅ Cursor  
+✅ VS Code MCP extension  
+✅ Any MCP client supporting Streamable HTTP
+
+---
+
+## Transport Modes
+
+| Transport | When to use |
+|---|---|
+| `stdio` | Local Claude Desktop — server runs as a child process |
+| `streamable-http` | Remote deployment, Docker, Render — server listens on HTTP |
 
 ---
 
@@ -23,7 +109,7 @@ expense-mcp-server/
 │   ├── config.py              # Pydantic Settings (reads from .env)
 │   ├── exceptions.py          # ExpenseNotFoundError, ExpenseValidationError
 │   ├── logging_config.py      # Structured logging setup
-│   ├── mcp_instance.py        # FastMCP instance
+│   ├── mcp_instance.py        # FastMCP instance + /health endpoint
 │   ├── server.py              # Registers all 8 tools
 │   ├── database/
 │   │   ├── db.py              # Engine, SessionLocal, validate_connection()
@@ -51,9 +137,9 @@ expense-mcp-server/
 │   └── test_expense.py        # 31 tests
 ├── run.py                     # Entry point
 ├── requirements.txt
-├── Dockerfile                 # Multi-stage build
-├── docker-compose.yml         # App + PostgreSQL stack
-├── render.yaml                # Render Blueprint (pserv + web)
+├── Dockerfile                 # Multi-stage Docker build
+├── docker-compose.yml         # App + PostgreSQL local stack
+├── render.yaml                # Render Blueprint (PostgreSQL + Docker web service)
 └── .env                       # Local environment variables
 ```
 
@@ -83,19 +169,12 @@ expense-mcp-server/
 | `MCP_SERVER_NAME` | `Expense Tracker` | Name shown in Claude Desktop |
 | `TRANSPORT` | `stdio` | `stdio` or `streamable-http` |
 | `HOST` | `0.0.0.0` | Bind host (HTTP mode only) |
-| `PORT` | `8000` | Bind port (HTTP mode only) |
+| `PORT` | `8000` | Bind port for local/Docker. **Render injects `PORT=10000` automatically — no manual configuration needed.** |
 | `DATABASE_URL` | `sqlite:///./expenses.db` | SQLite or PostgreSQL connection string |
 
 ---
 
 ## 🚀 Getting Started
-
-### Prerequisites
-
-- Python 3.11+
-- (Optional) Docker & Docker Compose
-
----
 
 ### Option A — Local Development (STDIO + SQLite)
 
@@ -155,7 +234,7 @@ docker-compose up --build
 
 This starts:
 - `expense_postgres` — PostgreSQL 16 on port 5432
-- `expense_mcp` — MCP server on port 8000 (HTTP transport)
+- `expense_mcp` — MCP server on port 8000 (Streamable HTTP transport)
 
 The app waits for PostgreSQL to pass its health check before starting.
 
@@ -167,20 +246,51 @@ curl http://localhost:8000/health
 
 ---
 
-### Option C — Deploy to Render (HTTP + PostgreSQL)
+### Option C — Deploy to Render (Docker + PostgreSQL)
+
+The project deploys as a **Docker multi-stage image** on Render.
 
 **1. Push your repo to GitHub**
 
 **2. Go to [render.com](https://render.com) → New → Blueprint**
 
-**3. Connect your GitHub repo** — Render auto-detects `render.yaml` and creates:
-- A **PostgreSQL** database (`expense-db`)
-- A **Web Service** (`expense-mcp-server`) on port 10000
+**3. Connect your GitHub repo** — Render auto-detects `render.yaml` and automatically creates:
+- A **managed PostgreSQL database**
+- A **Docker web service** running `run.py`
+- All required **environment variables**
+- **Database connection** wired via `fromDatabase.connectionString`
 
 **4. Your server will be live at:**
 ```
-https://expense-mcp-server.onrender.com
+https://<your-render-service>.onrender.com
 ```
+
+> Replace `<your-render-service>` with your actual Render service name (shown in the dashboard after deployment).
+
+---
+
+## 🔍 Health Check
+
+The server exposes `/health` for Render and load balancer health checks.
+
+```bash
+curl https://<your-render-service>.onrender.com/health
+```
+
+**Response:**
+```json
+{"status": "ok"}
+```
+
+---
+
+## 🔌 Verify the MCP Endpoint
+
+```
+GET https://<your-render-service>.onrender.com/mcp
+```
+
+> **Note:** A browser will show `405 Method Not Allowed`. This is expected — `/mcp` speaks the MCP protocol (not plain HTTP GET). Use an MCP client to connect.
 
 ---
 
@@ -207,9 +317,9 @@ Add to `%APPDATA%\Claude\claude_desktop_config.json` (Windows) or
 ```json
 {
   "mcpServers": {
-    "expense-tracker-remote": {
+    "expense-tracker": {
       "type": "streamable-http",
-      "url": "https://expense-mcp-server.onrender.com/mcp"
+      "url": "https://<your-render-service>.onrender.com/mcp"
     }
   }
 }
@@ -220,7 +330,7 @@ Add to `%APPDATA%\Claude\claude_desktop_config.json` (Windows) or
 ```json
 {
   "mcpServers": {
-    "expense-tracker-docker": {
+    "expense-tracker": {
       "type": "streamable-http",
       "url": "http://localhost:8000/mcp"
     }
