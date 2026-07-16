@@ -1,11 +1,11 @@
 services:
 
-  # ── PostgreSQL Database ────────────────────────────────────────────────────
-- type: pserv
-  name: expense-db
-  plan: free
+  # ── PostgreSQL Database ───────────────────────────────────────
+  - type: pserv
+    name: expense-db
+    plan: free
 
-  # ── MCP Web Service ────────────────────────────────────────────────────────
+  # ── MCP Web Service ───────────────────────────────────────────
   - type: web
     name: expense-mcp-server
     plan: free
