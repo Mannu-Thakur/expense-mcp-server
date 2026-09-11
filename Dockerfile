@@ -31,7 +31,7 @@ COPY app/ ./app/
 COPY run.py .
 
 # Non-root user for security
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser && chown -R appuser:appgroup /app
 USER appuser
 
 # Default to HTTP transport in container
