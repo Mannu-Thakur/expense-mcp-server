@@ -1,5 +1,7 @@
 from datetime import date
+from decimal import Decimal
 
+from app.auth import get_request_owner_id, require_write_scope
 from app.mcp_instance import mcp
 from app.schemas.expense import ExpenseUpdate
 from app.services.expense_service import ExpenseService
@@ -8,7 +10,7 @@ from app.services.expense_service import ExpenseService
 @mcp.tool()
 def update_expense(
     expense_id: int,
-    amount: float | None = None,
+    amount: Decimal | None = None,
     category: str | None = None,
     description: str | None = None,
     merchant: str | None = None,
@@ -16,12 +18,10 @@ def update_expense(
     currency: str | None = None,
     expense_date: str | None = None,
 ) -> dict:
-    """Update an existing expense by ID. Only supply fields you want to change."""
-    parsed_date = (
-        date.fromisoformat(expense_date) if expense_date else None
-    )
+    """Update this user's expense by ID. HTTP callers need expenses:write."""
+    require_write_scope()
+    parsed_date = date.fromisoformat(expense_date) if expense_date else None
 
-    # Build only the fields the caller actually provided
     fields: dict = {}
     if amount is not None:
         fields["amount"] = amount
@@ -39,14 +39,17 @@ def update_expense(
         fields["expense_date"] = parsed_date
 
     expense = ExpenseUpdate(**fields)
-
-    updated = ExpenseService.update_expense(expense_id, expense)
-
+    updated = ExpenseService.update_expense(
+        expense_id,
+        expense,
+        owner_id=get_request_owner_id(),
+    )
     return {
         "message": "Expense updated successfully.",
         "expense_id": updated.id,
-        "amount": updated.amount,
+        "amount": float(updated.amount),
         "category": updated.category,
         "merchant": updated.merchant,
+        "currency": updated.currency,
         "expense_date": str(updated.expense_date),
     }

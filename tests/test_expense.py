@@ -127,6 +127,41 @@ class TestExpenseRepository:
 
 class TestExpenseService:
 
+    def test_expense_operations_are_isolated_by_owner(self):
+        owner_a = "issuer-a-subject-a"
+        owner_b = "issuer-b-subject-b"
+        expense_a = ExpenseService.add_expense(
+            ExpenseCreate(
+                amount=10,
+                category="Food",
+                merchant="Cafe A",
+                expense_date=date.today(),
+            ),
+            owner_id=owner_a,
+        )
+        expense_b = ExpenseService.add_expense(
+            ExpenseCreate(
+                amount=99,
+                category="Rent",
+                merchant="Landlord B",
+                expense_date=date.today(),
+            ),
+            owner_id=owner_b,
+        )
+
+        assert [expense.id for expense in ExpenseService.list_expenses(owner_a)] == [expense_a.id]
+        assert [expense.id for expense in ExpenseService.search_expenses("Landlord", owner_a)] == []
+        assert ExpenseService.monthly_summary(owner_a)["transaction_count"] == 1
+        assert [row["category"] for row in ExpenseService.category_summary(owner_a)] == ["Food"]
+        assert [row["merchant"] for row in ExpenseService.top_merchants(owner_id=owner_a)] == ["Cafe A"]
+
+        with pytest.raises(ExpenseNotFoundError):
+            ExpenseService.update_expense(expense_b.id, ExpenseUpdate(category="Taken"), owner_a)
+        with pytest.raises(ExpenseNotFoundError):
+            ExpenseService.delete_expense(expense_b.id, owner_a)
+
+        assert [expense.id for expense in ExpenseService.list_expenses(owner_b)] == [expense_b.id]
+
     def test_add_expense(self):
         payload = ExpenseCreate(
             amount=250.0,

@@ -1,21 +1,24 @@
+from pydantic import Field
+
+from app.auth import get_request_owner_id
 from app.mcp_instance import mcp
 from app.services.expense_service import ExpenseService
 
 
 @mcp.tool()
-def search_expenses(query: str) -> list[dict]:
-    """Search expenses by category, description, or merchant."""
-    expenses = ExpenseService.search_expenses(query)
+def search_expenses(query: str = Field(min_length=1, max_length=200)) -> list[dict]:
+    """Search this user's expenses by category, description, or merchant."""
+    expenses = ExpenseService.search_expenses(query, owner_id=get_request_owner_id())
     return [
         {
-            "id": e.id,
-            "amount": e.amount,
-            "category": e.category,
-            "description": e.description,
-            "merchant": e.merchant,
-            "payment_method": e.payment_method,
-            "currency": e.currency,
-            "expense_date": str(e.expense_date),
+            "id": expense.id,
+            "amount": float(expense.amount),
+            "category": expense.category,
+            "description": expense.description,
+            "merchant": expense.merchant,
+            "payment_method": expense.payment_method,
+            "currency": expense.currency,
+            "expense_date": str(expense.expense_date),
         }
-        for e in expenses
+        for expense in expenses
     ]

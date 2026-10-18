@@ -39,9 +39,22 @@ services:
           name: expense-db
           property: connectionString
 
+      # Supply these values from the identity provider before enabling HTTP.
+      - key: OAUTH_ISSUER_URL
+        sync: false
+      - key: OAUTH_JWKS_URL
+        sync: false
+      - key: OAUTH_AUDIENCE
+        sync: false
+      - key: OAUTH_RESOURCE_URL
+        sync: false
+      - key: OAUTH_JWT_ALGORITHM
+        value: RS256
+
 # ── PostgreSQL Databases ───────────────────────────────────────────────────────
 # Render Postgres must be defined here, under `databases:` — never in `services:`
 databases:
   - name: expense-db
+    # Free is for demos only: Render free Postgres expires after 30 days and has no backups.
     plan: free
     region: singapore
