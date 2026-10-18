@@ -40,6 +40,8 @@ services:
           property: connectionString
 
       # Supply these values from the identity provider before enabling HTTP.
+      # On an existing Blueprint service, add them manually in the Render
+      # Dashboard: sync:false only prompts during the initial Blueprint setup.
       - key: OAUTH_ISSUER_URL
         sync: false
       - key: OAUTH_JWKS_URL

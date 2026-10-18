@@ -58,11 +58,15 @@ The `/health` route is public for hosting-platform health checks and returns 503
 
 ## PostgreSQL and schema migration
 
-PostgreSQL is required when `APP_ENV=production`; there is no SQLite fallback. The application checks database connectivity before serving requests, applies a migration to existing `expenses` tables, creates missing tables, and ensures an owner index exists. Legacy amounts are rounded to the supported currency precision during migration (zero fractional digits for JPY, two for other supported currencies); blank currency values become INR and existing currency codes are uppercased. Back up existing data before deploying this migration.
+PostgreSQL is required when `APP_ENV=production`; there is no SQLite fallback. The application checks database connectivity before serving requests, applies a migration to existing `expenses` tables, creates missing tables, and ensures an owner index exists. Legacy amounts are rounded to the supported currency precision during migration (zero fractional digits for JPY, two for other supported currencies); blank currency values become INR and existing currency codes are trimmed and uppercased. Migration stops without truncating currency values longer than three characters or accepting NULL amounts, categories, or dates. Back up existing data before deploying this migration.
 
 For Render, the Blueprint creates a free PostgreSQL database for demos. Render's free databases expire after 30 days and do not include backups, so do not store expense data you need to retain there. Upgrade the database plan before using it for ongoing data.
 
-The Blueprint also declares OAuth environment variables as operator-supplied values. Configure them in Render from your identity provider before deploying the HTTP service; this repository does not contain provider credentials.
+The Blueprint declares `OAUTH_ISSUER_URL`, `OAUTH_JWKS_URL`, `OAUTH_AUDIENCE`, and `OAUTH_RESOURCE_URL` as operator-supplied values. This repository does not contain identity-provider credentials. On an existing Blueprint-managed service, Render does not prompt again for newly added `sync: false` variables during a later Blueprint sync; add these values manually on the service's Environment page, then save and deploy. See [Render's Blueprint environment-variable behavior](https://render.com/docs/blueprint-spec#setting-environment-variables).
+
+For `OAUTH_RESOURCE_URL`, use the public Render service URL with `/mcp` appended. The issuer must exactly match the token's `iss` claim, the JWKS URL must be the issuer's signing-key endpoint, and the audience must match the access tokens issued for this MCP server. Grant `expenses:read` for reads and `expenses:write` for mutations. Do not guess these values or copy them from another identity provider.
+
+After deployment, verify the protected-resource metadata at `/.well-known/oauth-protected-resource/mcp`, then send an MCP `initialize` request to `/mcp` without a bearer token and confirm it returns `401`. A successful `/health` response alone proves only that PostgreSQL is reachable; it does not prove the MCP endpoint is protected. Until these checks pass, do not use a hosted endpoint for expense data. If a previously deployed revision remains active after a failed deploy, suspend that Render web service until OAuth is configured and the authenticated flow is verified.
 
 ## Validation
 
@@ -73,6 +77,10 @@ python -m pytest -q
 ```
 
 PostgreSQL migration tests run when `TEST_POSTGRES_URL` points to a disposable test database. The GitHub Actions workflow provisions PostgreSQL and runs both the suite and startup checks on pushes and pull requests.
+
+## Agent skill package
+
+[`skills/expense-tracker-mcp-companion/SKILL.md`](skills/expense-tracker-mcp-companion/SKILL.md) contains the companion instructions for compatible agents. The skill requires this MCP server to be installed and connected separately; it does not include or host the server or its database. Use a private local STDIO connection for personal ledgers unless hosted OAuth authentication has been configured and verified.
 
 ## License
 
