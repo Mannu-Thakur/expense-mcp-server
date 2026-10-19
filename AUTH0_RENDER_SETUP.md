@@ -27,7 +27,9 @@ Under the API's permissions/scopes, add exactly:
 - `expenses:read`
 - `expenses:write`
 
-Enable RBAC for the API. Create a role such as **Expense Ledger Owner**, grant it both permissions, and assign that role to your Auth0 user. The server requires `expenses:read` for every HTTP request and additionally requires `expenses:write` for mutations. The access token must expose the granted scopes in its `scope` or `scp` claim; an Auth0 `permissions` claim by itself is not read by this server.
+For this single-user demo on Auth0 Free, leave API RBAC disabled. Auth0's current pricing lists role management as unavailable on Free; with RBAC disabled, the requested API scopes pass through into the access token's `scope` claim. The server requires `expenses:read` for every HTTP request and additionally requires `expenses:write` for mutations. The access token must expose scopes in its `scope` or `scp` claim; an Auth0 `permissions` claim by itself is not read by this server.
+
+Because this demo does not use Auth0 role-based scope assignment, restrict who can log in to this tenant. Create only your own database-connection user in **User Management > Users**, then open **Authentication > Database**, select that connection, and enable **Disable Sign Ups** before exposing the MCP service. Do not enable other login connections for users who should not access this personal demo. Any logged-in user who can authorize the API can request its listed scopes. For a multi-user public release, use an authorization setup that grants scopes per user (such as Auth0 RBAC on a plan that includes role management) and review the deployment separately.
 
 ## 2. Enable resource parameter compatibility
 
