@@ -8,7 +8,7 @@ from mcp.server.auth.provider import AccessToken
 from mcp.server.auth.settings import AuthSettings
 from pydantic import AnyHttpUrl
 
-from app.mcp_instance import SecureFastMCP
+from app.mcp_instance import SecureMCPServer
 
 
 ISSUER = AnyHttpUrl("https://identity.example.test/")
@@ -37,13 +37,13 @@ class StubTokenVerifier:
 
 
 def make_http_app():
-    server = SecureFastMCP(
+    server = SecureMCPServer(
         name="test-expenses",
-        streamable_http_path="/mcp",
         auth=AuthSettings(
             issuer_url=ISSUER,
             resource_server_url=RESOURCE,
             required_scopes=["expenses:read"],
+            validate_token_resource=True,
         ),
         token_verifier=StubTokenVerifier(),
     )
@@ -52,7 +52,10 @@ def make_http_app():
     async def health(request: Request) -> JSONResponse:
         return JSONResponse({"status": "ok"})
 
-    return server.streamable_http_app()
+    return server.streamable_http_app(
+        host="0.0.0.0",
+        streamable_http_path="/mcp",
+    )
 
 
 def test_http_endpoint_requires_valid_read_scope_and_health_is_public():
@@ -65,6 +68,53 @@ def test_http_endpoint_requires_valid_read_scope_and_health_is_public():
             ) as client:
                 assert (await client.get("/health")).status_code == 200
                 assert (await client.get("/mcp")).status_code == 401
+
+                legacy_initialize = {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2025-11-25",
+                        "capabilities": {},
+                        "clientInfo": {"name": "auth-check", "version": "1"},
+                    },
+                }
+                assert (
+                    await client.post(
+                        "/mcp",
+                        json=legacy_initialize,
+                        headers={"accept": "application/json, text/event-stream"},
+                    )
+                ).status_code == 401
+
+                authenticated_initialize = await client.post(
+                    "/mcp",
+                    json=legacy_initialize,
+                    headers={
+                        "accept": "application/json, text/event-stream",
+                        "authorization": "Bearer read",
+                    },
+                )
+                assert authenticated_initialize.status_code == 200
+                assert authenticated_initialize.headers.get("mcp-session-id")
+
+                modern_discovery = {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "server/discover",
+                    "params": {
+                        "protocolVersion": "2026-07-28",
+                        "clientCapabilities": {},
+                        "clientInfo": {"name": "auth-check", "version": "1"},
+                    },
+                }
+                assert (
+                    await client.post(
+                        "/mcp",
+                        json=modern_discovery,
+                        headers={"accept": "application/json, text/event-stream"},
+                    )
+                ).status_code == 401
                 assert (
                     await client.get(
                         "/mcp",
@@ -105,7 +155,7 @@ def test_resource_metadata_advertises_read_and_write_scopes():
 
 
 def test_sse_and_unauthenticated_http_cannot_start():
-    server = SecureFastMCP(name="test-expenses")
+    server = SecureMCPServer(name="test-expenses")
 
     try:
         server.run(transport="sse")

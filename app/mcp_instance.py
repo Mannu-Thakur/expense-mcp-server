@@ -7,7 +7,7 @@ from starlette.responses import JSONResponse
 
 from mcp.server.auth.routes import create_protected_resource_routes
 from mcp.server.auth.settings import AuthSettings
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from app.auth import JwtTokenVerifier
 from app.config import settings
@@ -17,9 +17,11 @@ from app.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-class SecureFastMCP(FastMCP):
-    def streamable_http_app(self) -> Starlette:
-        app = super().streamable_http_app()
+class SecureMCPServer(MCPServer):
+    def streamable_http_app(self, **kwargs) -> Starlette:
+        kwargs.setdefault("host", settings.HOST)
+        kwargs.setdefault("streamable_http_path", "/mcp")
+        app = super().streamable_http_app(**kwargs)
         auth = self.settings.auth
         if auth is None or auth.resource_server_url is None:
             return app
@@ -40,7 +42,7 @@ class SecureFastMCP(FastMCP):
     def run(
         self,
         transport: Literal["stdio", "sse", "streamable-http"] = "stdio",
-        mount_path: str | None = None,
+        **kwargs,
     ) -> None:
         if transport == "sse":
             raise RuntimeError("SSE transport is disabled. Use authenticated Streamable HTTP instead.")
@@ -48,7 +50,11 @@ class SecureFastMCP(FastMCP):
             self.settings.auth is None or self._token_verifier is None
         ):
             raise RuntimeError("HTTP transport is disabled until OAuth authentication is configured.")
-        super().run(transport=transport, mount_path=mount_path)
+        if transport == "streamable-http":
+            kwargs.setdefault("host", settings.HOST)
+            kwargs.setdefault("port", settings.PORT)
+            kwargs.setdefault("streamable_http_path", "/mcp")
+        super().run(transport=transport, **kwargs)
 
 
 _oauth = settings.oauth_config(required=settings.TRANSPORT.lower() == "streamable-http")
@@ -66,14 +72,13 @@ if _oauth:
         issuer_url=AnyHttpUrl(_oauth["issuer_url"]),
         resource_server_url=AnyHttpUrl(_oauth["resource_url"]),
         required_scopes=["expenses:read"],
+        validate_token_resource=True,
     )
 
-mcp = SecureFastMCP(
+mcp = SecureMCPServer(
     name=settings.MCP_SERVER_NAME,
+    version="1.0.0",
     instructions="A personal expense ledger. Reads require expenses:read; changes require expenses:write.",
-    host=settings.HOST,
-    port=settings.PORT,
-    streamable_http_path="/mcp",
     auth=_auth_settings,
     token_verifier=_token_verifier,
 )

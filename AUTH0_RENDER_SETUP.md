@@ -2,6 +2,8 @@
 
 This guide configures the existing hosted Expense MCP service to use Auth0 for user sign-in and JWT access tokens. Auth0 issues and validates identities; the MCP server validates each token and keeps each user's expenses in a separate PostgreSQL ledger.
 
+The repository uses MCP Python SDK 2.3.0, which supports the current 2026-07-28 protocol and earlier clients. The release tests exercise current discovery and legacy initialization through the authentication boundary.
+
 ## Before you start
 
 - Create an Auth0 account and a development tenant under your own account. Auth0 currently lists a $0 Free plan with up to 25,000 monthly active users; check its current terms before relying on that limit.

@@ -6,11 +6,11 @@
 #                       "pywin32>=310; sys_platform == 'win32'". Not available on Linux.
 #   aiosqlite==0.22.1 — Async SQLite driver. Project uses synchronous SQLAlchemy only.
 #                       Zero imports of aiosqlite anywhere in the codebase.
-#   annotated-doc==0.0.4 — Not a dependency of any package in the project's graph.
-#                          Likely a stale pip artifact from a prior experiment.
+#   annotated-doc==0.0.4 — Superseded by annotated-doc==0.0.5, required by the
+#                          pinned typer release below.
 
 # ── MCP framework ──────────────────────────────────────────────────────────────
-mcp==1.28.1
+mcp==2.3.0
 
 # ── Pydantic (settings + validation) ──────────────────────────────────────────
 pydantic==2.13.4
@@ -36,6 +36,9 @@ h11==0.16.0
 httpx==0.28.1
 httpx-sse==0.4.3
 httpcore==1.0.9
+httpx2==2.14.0
+httpcore2==2.14.0
+truststore==0.10.5
 anyio==4.14.2
 idna==3.18
 certifi==2026.6.17
@@ -47,6 +50,8 @@ cffi==2.1.0
 pycparser==3.0
 
 # ── Schema validation (mcp transitive) ────────────────────────────────────────
+mcp-types==2.3.0
+opentelemetry-api==1.45.1
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 referencing==0.37.0
@@ -55,6 +60,7 @@ attrs==26.1.0
 
 # ── CLI / display (mcp / typer transitive) ─────────────────────────────────────
 typer==0.26.8
+annotated-doc==0.0.5
 click==8.4.2
 rich==15.0.0
 shellingham==1.5.4

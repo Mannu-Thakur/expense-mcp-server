@@ -2,6 +2,8 @@
 
 A personal expense ledger exposed as eight Model Context Protocol (MCP) tools. Local clients use STDIO. Hosted clients use authenticated Streamable HTTP and PostgreSQL.
 
+The server uses MCP Python SDK 2.3.0, which supports the 2026-07-28 protocol revision and earlier clients. Its HTTP resource server requires OAuth before any MCP request reaches a tool.
+
 ## Supported tools
 
 - `add_expense`
