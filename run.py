@@ -21,10 +21,15 @@ def startup() -> None:
         raise SystemExit(1) from None
 
     try:
-        settings.oauth_config(required=transport != "stdio")
+        oauth = settings.oauth_config(required=False)
     except ValueError as exc:
         logger.critical("HTTP authentication configuration is invalid: %s", exc)
         raise SystemExit(1) from None
+
+    if transport == "streamable-http" and oauth is None:
+        logger.warning(
+            "OAuth is not configured; startup will keep /mcp disabled with HTTP 503 until the four OAuth values are set."
+        )
 
     try:
         db.validate_connection()

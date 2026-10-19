@@ -4,6 +4,7 @@ from pydantic import AnyHttpUrl
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from mcp.server.auth.routes import create_protected_resource_routes
 from mcp.server.auth.settings import AuthSettings
@@ -17,13 +18,45 @@ from app.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+class OAuthNotConfiguredMiddleware:
+    """Keep hosted MCP routes unavailable until OAuth is configured."""
+
+    def __init__(self, app: ASGIApp, *, path: str) -> None:
+        self.app = app
+        self.path = path.rstrip("/") or "/"
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        request_path = scope.get("path", "")
+        if scope["type"] == "http" and (
+            request_path == self.path or request_path.startswith(f"{self.path}/")
+        ):
+            response = JSONResponse(
+                {
+                    "error": "oauth_not_configured",
+                    "detail": "MCP access is disabled until OAuth authentication is configured.",
+                },
+                status_code=503,
+            )
+            await response(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
+
 class SecureMCPServer(MCPServer):
     def streamable_http_app(self, **kwargs) -> Starlette:
         kwargs.setdefault("host", settings.HOST)
         kwargs.setdefault("streamable_http_path", "/mcp")
         app = super().streamable_http_app(**kwargs)
         auth = self.settings.auth
-        if auth is None or auth.resource_server_url is None:
+        if (
+            auth is None
+            or auth.resource_server_url is None
+            or self._token_verifier is None
+        ):
+            app.add_middleware(
+                OAuthNotConfiguredMiddleware,
+                path=kwargs["streamable_http_path"],
+            )
             return app
 
         metadata_route = create_protected_resource_routes(
@@ -46,18 +79,18 @@ class SecureMCPServer(MCPServer):
     ) -> None:
         if transport == "sse":
             raise RuntimeError("SSE transport is disabled. Use authenticated Streamable HTTP instead.")
-        if transport == "streamable-http" and (
-            self.settings.auth is None or self._token_verifier is None
-        ):
-            raise RuntimeError("HTTP transport is disabled until OAuth authentication is configured.")
         if transport == "streamable-http":
+            if self.settings.auth is None or self._token_verifier is None:
+                logger.warning(
+                    "OAuth is not configured; the HTTP health route will run but MCP requests will return 503."
+                )
             kwargs.setdefault("host", settings.HOST)
             kwargs.setdefault("port", settings.PORT)
             kwargs.setdefault("streamable_http_path", "/mcp")
         super().run(transport=transport, **kwargs)
 
 
-_oauth = settings.oauth_config(required=settings.TRANSPORT.lower() == "streamable-http")
+_oauth = settings.oauth_config(required=False)
 _auth_settings = None
 _token_verifier = None
 if _oauth:

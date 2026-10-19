@@ -154,19 +154,39 @@ def test_resource_metadata_advertises_read_and_write_scopes():
     assert response.json()["scopes_supported"] == ["expenses:read", "expenses:write"]
 
 
-def test_sse_and_unauthenticated_http_cannot_start():
+def test_http_without_oauth_is_healthy_but_mcp_is_disabled():
     server = SecureMCPServer(name="test-expenses")
 
+    @server.custom_route("/health", methods=["GET"])
+    async def health(request: Request) -> JSONResponse:
+        return JSONResponse({"status": "ok"})
+
+    app = server.streamable_http_app(host="0.0.0.0", streamable_http_path="/mcp")
+
+    async def check():
+        async with app.router.lifespan_context(app):
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app),
+                base_url="http://testserver",
+            ) as client:
+                assert (await client.get("/health")).status_code == 200
+                assert (await client.get("/mcp")).status_code == 503
+                response = await client.post(
+                    "/mcp",
+                    json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+                    headers={"accept": "application/json, text/event-stream"},
+                )
+                assert response.status_code == 503
+                assert response.json()["error"] == "oauth_not_configured"
+
+    asyncio.run(check())
+
+
+def test_sse_transport_is_disabled():
+    server = SecureMCPServer(name="test-expenses")
     try:
         server.run(transport="sse")
     except RuntimeError as exc:
         assert "SSE transport is disabled" in str(exc)
     else:
         raise AssertionError("SSE should not start")
-
-    try:
-        server.run(transport="streamable-http")
-    except RuntimeError as exc:
-        assert "OAuth authentication" in str(exc)
-    else:
-        raise AssertionError("Unauthenticated HTTP should not start")

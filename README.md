@@ -15,7 +15,7 @@ The server uses MCP Python SDK 2.3.0, which supports the 2026-07-28 protocol rev
 - `category_summary`
 - `top_merchants`
 
-The server keeps each authenticated HTTP user's ledger separate using a SHA-256 hash of the verified issuer and subject. Reads require `expenses:read`; writes require both `expenses:read` and `expenses:write`. User identity is never accepted as a tool argument. All supported transports fail closed when their required configuration is missing. SSE is disabled.
+The server keeps each authenticated HTTP user's ledger separate using a SHA-256 hash of the verified issuer and subject. Reads require `expenses:read`; writes require both `expenses:read` and `expenses:write`. User identity is never accepted as a tool argument. When the OAuth settings are missing, the HTTP service can start for its database health check but the MCP route returns `503`; partial OAuth settings fail startup. SSE is disabled.
 
 ## Local STDIO with PostgreSQL
 
@@ -56,7 +56,7 @@ HTTP requires an external OpenID Connect/OAuth provider that issues signed JWT a
 
 Tokens must have valid signatures and include `exp`, `iss`, `sub`, `aud`, and a `scope` or `scp` claim. They must carry `expenses:read`; mutations also require `expenses:write`. The verifier uses the configured JWKS, issuer, audience, and algorithm, with a short network timeout and cached signing keys. Production issuer, JWKS, and resource URLs must use HTTPS. Loopback HTTP is allowed only outside production.
 
-The `/health` route is public for hosting-platform health checks and returns 503 when PostgreSQL is unavailable. The MCP endpoint and its tools are protected. Do not expose a server until the OAuth provider has been configured and the HTTP auth flow has been tested with real credentials.
+The `/health` route is public for hosting-platform health checks and returns 503 when PostgreSQL is unavailable. If no OAuth settings are configured, `/mcp` returns 503 so Render can replace an older revision without opening an unauthenticated MCP endpoint. Once OAuth is configured, the MCP endpoint and its tools require a valid token. Do not use a hosted MCP endpoint until the provider has been configured and the HTTP auth flow has been tested with real credentials.
 
 ## PostgreSQL and schema migration
 

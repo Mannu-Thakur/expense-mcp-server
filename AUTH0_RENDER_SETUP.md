@@ -8,7 +8,7 @@ The repository uses MCP Python SDK 2.3.0, which supports the current 2026-07-28 
 
 - Create an Auth0 account and a development tenant under your own account. Auth0 currently lists a $0 Free plan with up to 25,000 monthly active users; check its current terms before relying on that limit.
 - Do not send or commit passwords, client secrets, API keys, or access tokens. The MCP server needs only the public issuer, JWKS endpoint, API audience, and its own public resource URL.
-- Suspend the Render web service until OAuth is configured. As checked on 2026-10-19, the current public revision returns `200` to an unauthenticated MCP `initialize` request and returns `404` for the protected-resource metadata route.
+- As checked on 2026-10-19, the currently serving older Render revision returns `200` to an unauthenticated MCP `initialize` request and returns `404` for the protected-resource metadata route. Deploy the current fail-closed revision as soon as possible; without OAuth values it will keep `/health` available but return `503` for all MCP traffic.
 
 ## 1. Create the Auth0 API
 
@@ -75,7 +75,7 @@ After the deployment completes, verify all of the following:
 4. Connect using the intended MCP client and sign in through Auth0. Confirm it receives an access token whose `iss`, `aud`, expiration, and scopes match the configured values.
 5. Confirm a read request works with `expenses:read`, a mutation without `expenses:write` is rejected, and separate Auth0 users cannot view one another's entries.
 
-Only resume the Render service after the unauthenticated `initialize` is rejected and the authenticated client flow succeeds. The GitHub Actions workflow has passed unit/integration tests and production startup against PostgreSQL, but those results do not establish that the live Render/Auth0 flow is configured.
+Do not use the hosted MCP endpoint until the unauthenticated `initialize` is rejected and the authenticated client flow succeeds. The service can stay deployed in its safe `503` state while Auth0 is being configured. GitHub Actions verifies the application and PostgreSQL startup, but those results do not establish that the live Render/Auth0 flow is configured.
 
 ## References
 
