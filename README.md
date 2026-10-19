@@ -66,6 +66,8 @@ The Blueprint declares `OAUTH_ISSUER_URL`, `OAUTH_JWKS_URL`, `OAUTH_AUDIENCE`, a
 
 For `OAUTH_RESOURCE_URL`, use the public Render service URL with `/mcp` appended. The issuer must exactly match the token's `iss` claim, the JWKS URL must be the issuer's signing-key endpoint, and the audience must match the access tokens issued for this MCP server. Grant `expenses:read` for reads and `expenses:write` for mutations. Do not guess these values or copy them from another identity provider.
 
+For a step-by-step Auth0 setup that maps the provider values to this Render service, see [`AUTH0_RENDER_SETUP.md`](AUTH0_RENDER_SETUP.md).
+
 After deployment, verify the protected-resource metadata at `/.well-known/oauth-protected-resource/mcp`, then send an MCP `initialize` request to `/mcp` without a bearer token and confirm it returns `401`. A successful `/health` response alone proves only that PostgreSQL is reachable; it does not prove the MCP endpoint is protected. Until these checks pass, do not use a hosted endpoint for expense data. If a previously deployed revision remains active after a failed deploy, suspend that Render web service until OAuth is configured and the authenticated flow is verified.
 
 ## Validation
